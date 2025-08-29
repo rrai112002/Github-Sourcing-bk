@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@langchain/google-genai": "^0.2.16",
+    "body-parser": "^2.2.0",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "octokit": "^5.0.3"
+  }
+}
