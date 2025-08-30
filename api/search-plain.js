@@ -2,13 +2,13 @@
 import { searchPlain } from "../src/services/github.js";
 
 // CORS helper (same-origin? set to your frontend domain)
-// const ORIGIN = "https://github-sourcing.vercel.app";
-// function setCors(res) {
-//   res.setHeader("Access-Control-Allow-Origin", ORIGIN);
-//   res.setHeader("Vary", "Origin");
-//   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-//   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-// }
+const ORIGIN = "https://github-sourcing.vercel.app";
+function setCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", ORIGIN);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
 
 export default async function handler(req, res) {
     logger.info(req.body);
