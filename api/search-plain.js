@@ -1,10 +1,10 @@
 // api/search-plain.js
 import { searchPlain } from "../src/services/github.js";
 
-const FRONTEND = "https://github-sourcing.vercel.app";
+// const FRONTEND = "https://github-sourcing.vercel.app";
 
 function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", FRONTEND); // or "*" for testing
+  res.setHeader("Access-Control-Allow-Origin", "*"); // or "*" for testing
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
