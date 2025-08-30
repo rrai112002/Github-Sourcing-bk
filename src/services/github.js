@@ -5,9 +5,11 @@ import { calculateYearsExperience } from "../utils/experience.js";
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 // --- Search users with pagination ---
-async function searchUsers(query, maxUsers = 50) {
+async function searchUsersWithProfiles(query, maxUsers = 50) {
   let page = 1;
   let results = [];
+
+  // search users
   while (results.length < maxUsers) {
     const { data } = await octokit.request("GET /search/users", {
       q: query,
@@ -15,12 +17,30 @@ async function searchUsers(query, maxUsers = 50) {
       page,
       headers: { "X-GitHub-Api-Version": "2022-11-28" },
     });
+
     if (!data.items || data.items.length === 0) break;
+
     results = results.concat(data.items);
+
     if (results.length >= data.total_count || results.length >= maxUsers) break;
+
     page++;
   }
-  return results.slice(0, maxUsers);
+
+  // trim down to requested max
+  const users = results.slice(0, maxUsers);
+
+  // fetch full profiles
+  const profiles = await Promise.all(
+    users.map(u =>
+      octokit.request("GET /users/{username}", {
+        username: u.login,
+        headers: { "X-GitHub-Api-Version": "2022-11-28" },
+      }).then(res => res.data)
+    )
+  );
+
+  return profiles;
 }
 
 // --- Get details of a single user ---
