@@ -57,14 +57,61 @@
 //   }
 // }
 
-export default async function handler(req, res) {
-    res.setHeader("Access-Control-Allow-Origin", "*");
+// // export default async function handler(req, res) {
+// //     res.setHeader("Access-Control-Allow-Origin", "*");
+// //     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+// //     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  
+// //     if (req.method === "OPTIONS") return res.status(204).end();
+// //     if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+  
+// //     res.status(200).json({ ok: true, now: new Date().toISOString() });
+// //   }
+
+
+// api/search-plain.js
+
+// --- CORS helper ---
+function setCors(res) {
+    res.setHeader("Access-Control-Allow-Origin", "*"); // open for testing
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  }
+  
+  export default async function handler(req, res) {
+    setCors(res);
   
     if (req.method === "OPTIONS") return res.status(204).end();
-    if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
+    if (req.method !== "POST") {
+      res.setHeader("Allow", "POST, OPTIONS");
+      return res.status(405).json({ error: "Method Not Allowed" });
+    }
   
-    res.status(200).json({ ok: true, now: new Date().toISOString() });
+    try {
+      // Read body manually (important on Vercel)
+      const raw = await new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", (chunk) => (data += chunk));
+        req.on("end", () => resolve(data));
+        req.on("error", reject);
+      });
+  
+      let body = {};
+      try {
+        body = raw ? JSON.parse(raw) : {};
+      } catch {
+        return res.status(400).json({ error: "Invalid JSON body", raw });
+      }
+  
+      // Just echo it back for now
+      return res.status(200).json({
+        received: body,
+        now: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("❌ echo /api/search-plain error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
+  
   
