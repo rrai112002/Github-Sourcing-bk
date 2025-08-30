@@ -3,6 +3,7 @@ import { searchStructured, searchPlain } from "../services/github.js";
 
 const router = express.Router();
 
+
 const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 
 // POST /search  -> structured payload

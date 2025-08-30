@@ -39,6 +39,7 @@ const ExtractionSchema = z.object({
   need_activity_filters: z.boolean().default(false), 
 });
 
+
 // ──────────────────────────────────────────────────────────────────────────────
 // System prompt (extraction rules)
 // ──────────────────────────────────────────────────────────────────────────────
