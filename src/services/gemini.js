@@ -32,12 +32,11 @@ const ExtractionSchema = z.object({
       ])
     )
     .default([]),
-  keywords: z.array(z.string()).default([]), // frameworks/tools: React, Node.js, MongoDB, Django, Spring…
-  location: z.string().optional(),           // plain city/region text; we will quote
+  location: z.string().optional(),          
   min_experience: z.number().int().optional(),
   max_experience: z.number().int().optional(),
   limit: z.number().int().optional(),
-  need_activity_filters: z.boolean().default(false), // when years mentioned -> repos:>3 followers:>5
+  need_activity_filters: z.boolean().default(false), 
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -45,23 +44,46 @@ const ExtractionSchema = z.object({
 // ──────────────────────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `
 You are a GitHub sourcing assistant.
-Extract structured fields for a GitHub user search. Return ONLY data matching this schema.
+Extract structured fields for a GitHub USER search. Your output MUST match the given schema.
 
-Schema fields to fill:
-- languages: array of programming languages using exact GitHub names (e.g., JavaScript, Python ).
+Fill these fields:
+- languages: array of programming languages (from this exact set only):
+  C, C++, C#, Go, Java, JavaScript, Kotlin, PHP, Python, Ruby, Rust, Scala, Swift, TypeScript
 - location: city/region/country as plain text (no quotes).
 - min_experience, max_experience: integers or omit if unknown.
 - limit: integer or omit if unknown.
 - need_activity_filters: boolean; set to true when years of experience are mentioned.
 
+Language rules (very important):
+- Output ONLY languages that are explicitly mentioned in the request OR the single minimal primary language implied by a known stack.
+- NEVER add extra languages that were not asked for.
+- For these stacks, return exactly ONE primary language (unless the text explicitly names another language in addition):
+  • MERN → JavaScript
+  • MEAN → JavaScript
+  • LAMP → PHP
+  • Django → Python
+  • Spring → Java
+  • .NET → C#
+  • iOS → Swift
+  • Android → Kotlin (use Java ONLY if the text explicitly mentions Java)
+  • PERN → TypeScript if the text explicitly mentions TypeScript, otherwise JavaScript
+- Examples:
+  • "mern stack with 3+ years in bengaluru" → languages: ["JavaScript"], location: "bengaluru", min_experience: 3, need_activity_filters: true
+  • "android dev, 2-5 years, pune" → languages: ["Kotlin"], min_experience: 2, max_experience: 5, location: "pune", need_activity_filters: true
+  • "java + spring, up to 5 years, noida" → languages: ["Java"], max_experience: 5, location: "noida", need_activity_filters: true
+- Do NOT infer multiple languages for MERN/MEAN/etc. Do NOT add Python/Go/C#/… unless explicitly requested.
 
-Guidelines:
-- Put programming languages only in "languages". Do NOT include frameworks/tools in "languages".
-- If location is present in the request, set "location".
-- If years are present, set min/max accordingly and set need_activity_filters=true.
-- Preserve the order of languages as listed by you; if JSON is present, prefer placing it first.
-- For any stack like mern mean, extract individual languages from language schema only.
+Experience rules:
+- "3+ years" => min_experience = 3, max_experience omitted, need_activity_filters = true
+- "up to 5 years" => max_experience = 5, need_activity_filters = true
+- "2-5 years" => min_experience = 2, max_experience = 5, need_activity_filters = true
+
+Location:
+- If present, copy it as plain text (no quotes). Do not guess.
+
+Output ONLY data that fits the schema. Do not include explanations.
 `.trim();
+
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers + deterministic query builder
