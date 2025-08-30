@@ -1,19 +1,7 @@
-// REMOVE this line:
-// import { Octokit } from "octokit";
-
-// ADD this helper instead:
-let _octokit;
-async function getOctokit() {
-  if (!_octokit) {
-    const { Octokit } = await import("octokit");
-    _octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-  }
-  return _octokit;
-}
-
+import { Octokit } from "octokit";
 import { parsePlainText } from "./gemini.js";
 
-// const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 
 // Helpers
@@ -41,27 +29,7 @@ async function withRateLimitRetry(fn, { tries = 3, baseDelayMs = 1500 } = {}) {
   }
 }
 
-// async function fetchUserDetails(username) {
-//   const { data: user } = await withRateLimitRetry(() =>
-//     octokit.request("GET /users/{username}", {
-//       username,
-//       headers: { "X-GitHub-Api-Version": "2022-11-28" },
-//     })
-//   );
-
-//   // Grab up to first 100 repos (good balance of info vs calls)
-//   const { data: repos } = await withRateLimitRetry(() =>
-//     octokit.request("GET /users/{username}/repos", {
-//       username,
-//       per_page: 100,
-//       sort: "created",
-//       direction: "asc",
-//       headers: { "X-GitHub-Api-Version": "2022-11-28" },
-//     })
-//   );
 async function fetchUserDetails(username) {
-  const octokit = await getOctokit();
-
   const { data: user } = await withRateLimitRetry(() =>
     octokit.request("GET /users/{username}", {
       username,
@@ -69,6 +37,7 @@ async function fetchUserDetails(username) {
     })
   );
 
+  // Grab up to first 100 repos (good balance of info vs calls)
   const { data: repos } = await withRateLimitRetry(() =>
     octokit.request("GET /users/{username}/repos", {
       username,
@@ -129,27 +98,9 @@ async function fetchUserDetails(username) {
 // --- Search users with pagination (returns *summaries*) ---
 // Keep the same function name as you asked.
 // Ask for as many as you want via maxUsers (defaults to 1000, GitHub cap).
-// async function searchUsers(query, maxUsers = 1000) {
-//   const per_page = 100; // fewer round-trips
-//   const HARD_CAP = 1000; // GitHub Search API cap
-//   const target = Math.min(maxUsers, HARD_CAP);
-
-//   let page = 1;
-//   let results = [];
-//   while (results.length < target) {
-//     const { data } = await withRateLimitRetry(() =>
-//       octokit.request("GET /search/users", {
-//         q: query,
-//         per_page,
-//         page,
-//         headers: { "X-GitHub-Api-Version": "2022-11-28" },
-//       })
-//     );
-
 async function searchUsers(query, maxUsers = 1000) {
-  const octokit = await getOctokit();
-  const per_page = 100;
-  const HARD_CAP = 1000;
+  const per_page = 100; // fewer round-trips
+  const HARD_CAP = 1000; // GitHub Search API cap
   const target = Math.min(maxUsers, HARD_CAP);
 
   let page = 1;
