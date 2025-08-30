@@ -1,6 +1,5 @@
 import { Octokit } from "octokit";
 import { parsePlainText } from "./gemini.js";
-import { calculateYearsExperience } from "../utils/experience.js";
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
@@ -43,23 +42,31 @@ async function searchUsersWithProfiles(query, maxUsers = 50) {
   return profiles;
 }
 
-// --- Get details of a single user ---
-async function getUserDetails(username) {
-  const { data: user } = await octokit.request("GET /users/{username}", {
-    username,
-    headers: { "X-GitHub-Api-Version": "2022-11-28" },
-  });
-  const { data: repos } = await octokit.request("GET /users/{username}/repos", {
-    username,
-    per_page: 100,
-    sort: "created",
-    direction: "asc",
-    headers: { "X-GitHub-Api-Version": "2022-11-28" },
-  });
+async function fetchUserDetails(username) {
+  const { data: user } = await withRateLimitRetry(() =>
+    octokit.request("GET /users/{username}", {
+      username,
+      headers: { "X-GitHub-Api-Version": "2022-11-28" },
+    })
+  );
 
-  const yearsExp = calculateYearsExperience(user, repos);
+  // Grab up to first 100 repos (good balance of info vs calls)
+  const { data: repos } = await withRateLimitRetry(() =>
+    octokit.request("GET /users/{username}/repos", {
+      username,
+      per_page: 100,
+      sort: "created",
+      direction: "asc",
+      headers: { "X-GitHub-Api-Version": "2022-11-28" },
+    })
+  );
 
-  let topPercent = "Long tail";
+  // Experience: (current UTC year - created_at UTC year) + 2, min 0
+  const createdYear = new Date(user.created_at).getUTCFullYear();
+  const currentYear = new Date().getUTCFullYear();
+  const yearsExp = Math.max(0, (currentYear - createdYear) + 2);
+
+  let topPercent = "Below 50%";
   if (user.followers > 1000) topPercent = "Top 1%";
   else if (user.followers > 500) topPercent = "Top 5%";
   else if (user.followers > 100) topPercent = "Top 10%";
@@ -101,25 +108,92 @@ async function getUserDetails(username) {
   };
 }
 
-// --- Structured search ---
-export async function searchStructured(query, minExp, maxExp, limit = 20) {
-  const users = await searchUsers(query, limit);
-  const results = [];
-  for (const u of users) {
-    const details = await getUserDetails(u.login);
+// --- Search users with pagination (returns *summaries*) ---
+// Keep the same function name as you asked.
+// Ask for as many as you want via maxUsers (defaults to 1000, GitHub cap).
+async function searchUsers(query, maxUsers = 1000) {
+  const per_page = 100; // fewer round-trips
+  const HARD_CAP = 1000; // GitHub Search API cap
+  const target = Math.min(maxUsers, HARD_CAP);
+
+  let page = 1;
+  let results = [];
+  while (results.length < target) {
+    const { data } = await withRateLimitRetry(() =>
+      octokit.request("GET /search/users", {
+        q: query,
+        per_page,
+        page,
+        headers: { "X-GitHub-Api-Version": "2022-11-28" },
+      })
+    );
+
+    const items = (data.items || []).filter((u) => u.type === "User");
+    if (items.length === 0) break;
+
+    results = results.concat(items);
+
+    // stop if we’ve hit the API’s effective limit or your target
     if (
-      (!minExp || details.years_experience >= minExp) &&
-      (!maxExp || details.years_experience <= maxExp)
+      results.length >= target ||
+      results.length >= Math.min(data.total_count || target, HARD_CAP)
     ) {
-      results.push(details);
+      break;
+    }
+    page++;
+  }
+  return results.slice(0, target);
+}
+
+// Fetch profiles with limited concurrency
+async function fetchProfiles(logins, concurrency = 8) {
+  const out = [];
+  let i = 0;
+
+  async function worker() {
+    while (i < logins.length) {
+      const idx = i++;
+      const login = logins[idx];
+      try {
+        const d = await fetchUserDetails(login);
+        out.push(d);
+      } catch (e) {
+        // skip problematic users, keep going
+      }
     }
   }
-  return results;
+  await Promise.all(Array.from({ length: Math.min(concurrency, logins.length) }, worker));
+  return out;
+}
+
+// --- Structured search ---
+// Guarantees at least 50 profiles by default (increase `limit` to get more).
+export async function searchStructured(query, minExp, maxExp, limit = 50) {
+  console.log("Search structured:", { query, minExp, maxExp, limit });
+  const desired = Math.max(50, limit); // ensure minimum 50
+  // Over-fetch search results to survive filtering (3x is a good heuristic)
+  const candidateSummaries = await searchUsers(query, Math.min(1000, desired * 3));
+
+  const logins = [...new Set(candidateSummaries.map((u) => u.login))];
+
+  const details = await fetchProfiles(logins, 8);
+
+  const filtered = details.filter((d) => {
+    const geMin = !minExp || d.years_experience >= minExp;
+    const leMax = !maxExp || d.years_experience <= maxExp;
+    return geMin && leMax;
+  });
+
+  return filtered.slice(0, desired);
 }
 
 // --- Plain text search ---
 export async function searchPlain(text) {
   const parsed = await parsePlainText(text);
-  const { query, min_experience, max_experience } = parsed;
-  return await searchStructured(query, min_experience, max_experience, 20);
+  const { query, min_experience, max_experience, limit } = parsed;
+  // if your parser doesn’t supply limit, we’ll still return at least 50
+  return await searchStructured(query, min_experience, max_experience, limit ?? 50);
 }
+
+
+
