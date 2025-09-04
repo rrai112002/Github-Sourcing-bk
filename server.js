@@ -18,6 +18,9 @@ app.use(cors({ origin: 'http://localhost:5173' }))
 
 // Routes
 app.use("/", searchRoutes);
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ ok: true, now: new Date().toISOString() });
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend running at http://localhost:${PORT}`);
