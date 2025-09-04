@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@langchain/core": "^0.3.73",
     "@langchain/google-genai": "^0.2.16",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
