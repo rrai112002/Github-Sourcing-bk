@@ -6,7 +6,7 @@ const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 // Helpers
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function withRateLimitRetry(fn, { tries = 3, baseDelayMs = 1500 } = {}) {
+async function withRateLimitRetry(fn, { tries = 3, baseDelayMs = 500 } = {}) {
   let attempt = 0;
   // simple retry on 403/429 or secondary rate limit
   while (true) {
@@ -155,9 +155,9 @@ async function fetchProfiles(logins, concurrency = 8) {
 
 // --- Structured search ---
 // Guarantees at least 50 profiles by default (increase `limit` to get more).
-export async function searchStructured(query, minExp, maxExp, limit = 50) {
+export async function searchStructured(query, minExp, maxExp, limit = 150) {
   console.log("Search structured:", { query, minExp, maxExp, limit });
-  const desired = Math.max(50, limit); // ensure minimum 50
+  const desired = Math.max(150, limit); // ensure minimum 50
   // Over-fetch search results to survive filtering (3x is a good heuristic)
   const candidateSummaries = await searchUsers(query, Math.min(1000, desired * 3));
 
